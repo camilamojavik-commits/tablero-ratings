@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tablero de Ratings — Coderhouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F8F2E8; --ink:#171717; --orange:#FF632B; --pink:#FE64A3;
+    --red:#EF4444; --yellow:#FE872D; --green:#10b981; --amber:#f59e0b;
+    --card:#ffffff; --muted:#8a857c; --line:#ece4d6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand img{height:30px}
+  .brand h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .brand p{font-size:12px;color:var(--muted);font-weight:600}
+  .updated{font-size:12px;color:var(--muted);font-weight:600;text-align:right}
+  button.reload{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  button.reload:hover{background:#fffaf3}
+  button.reload:disabled{opacity:.5;cursor:default}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+  .tab{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;color:#6b6358}
+  .tab.active{background:var(--orange);color:#fff;border-color:var(--orange);box-shadow:0 6px 14px rgba(255,99,43,.25)}
+  section.view{display:none}
+  section.view.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:26px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:22px}
+  .card.dark{background:var(--ink);color:#fff;border:none}
+  .card h2{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+  .card .sub{font-size:13px;color:var(--muted);margin-top:4px}
+  .card.dark .sub{color:rgba(255,255,255,.55)}
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px}
+  .kpi .lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+  .kpi .val{font-size:30px;font-weight:800;margin-top:6px;line-height:1}
+  .kpi .delta{font-size:12px;font-weight:700;margin-top:6px}
+  .up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--muted)}
+  select{padding:10px 14px;border:1px solid var(--line);border-radius:12px;font-weight:700;font-size:13px;background:#fff;color:var(--ink);cursor:pointer;outline:none;font-family:inherit}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  td{padding:11px 12px;border-bottom:1px solid #f3ede2}
+  td.c,th.c{text-align:center}
+  tr:hover td{background:#fffaf3}
+  .pill{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:3px 9px;border-radius:999px}
+  .pill.new{background:#dcfce7;color:#047857}
+  .pill.old{background:#f1f5f9;color:#64748b}
+  .pill.seller{background:rgba(255,99,43,.12);color:var(--orange)}
+  .chart-box{position:relative;height:320px;margin-top:18px}
+  .chart-box.tall{height:420px}
+  .lists{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .listrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#fbf6ee;border-radius:12px;margin-bottom:7px}
+  .listrow .nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .listrow .sc{font-weight:800;font-size:15px;flex-shrink:0}
+  .note{font-size:12px;color:var(--muted);background:#fbf6ee;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;margin-top:14px}
+  .loading,.error{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:14px;text-align:center}
+  .spinner{width:40px;height:40px;border:4px solid #f0e6d6;border-top-color:var(--orange);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .muted{color:var(--muted)}
+  @media(max-width:720px){.lists{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img src="https://xgjzloifyvgpbmyonaya.supabase.co/storage/v1/object/public/files/QRNY-o2OOX/original" alt="Coderhouse" referrerpolicy="no-referrer" />
+      <div>
+        <h1>Tablero de Ratings</h1>
+        <p>Actualiza en vivo desde Google Sheets · vista semanal</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="updated" id="updated">—</div>
+      <button class="reload" id="reloadBtn" onclick="loadAll()">↻ Recargar</button>
+    </div>
+  </header>
+
+  <div id="app">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p style="font-weight:700">Cargando datos desde Google Sheets…</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== CONFIG ====== */
+const SHEET_ID = '1VvmrIcslmEZQCyW30iW7GZexcqGHuIOLP1nJNOMQ-F0';
+
+/* TOP 5 CURSOS MÁS VENDIDOS — editá esta lista cuando cambien.
+   El match con los nombres reales es por coincidencia de texto. */
+const TOP_SELLING_COURSES = ['Community Manager','AI Automation','Data Analytics','Excel','Desarrollo Web'];
+
+const MIN_RESPONSES = 3;
+const COMMISSION_RE = /^\d{4,6}$/;
+
+/* ====== DATE FILTER ====== */
+let FILTER = { preset:'all', start:'', end:'' };
+let ACTIVE_VIEW = 'cursos';
+function inFilter(ts){
+  if(FILTER.start){const s=new Date(FILTER.start);s.setHours(0,0,0,0);if(ts<s)return false;}
+  if(FILTER.end){const e=new Date(FILTER.end);e.setHours(23,59,59,999);if(ts>e)return false;}
+  return true;
+}
+function baseCourse(){ return COURSE_RATINGS.filter(r=>inFilter(r.timestamp)); }
+function maxDataDate(){
+  let mx=0; COURSE_RATINGS.forEach(r=>{const t=r.timestamp.getTime();if(t>mx)mx=t;});
+  return mx?new Date(mx):new Date();
+}
+function applyPreset(p){
+  FILTER.preset=p;
+  if(p==='all'){FILTER.start='';FILTER.end='';}
+  else if(p!=='custom'){
+    const weeks=parseInt(p.replace('w',''))||8;
+    const end=maxDataDate();
+    const start=weekStart(end); start.setDate(start.getDate()-(weeks-1)*7);
+    FILTER.start=start.toISOString().slice(0,10);
+    FILTER.end=end.toISOString().slice(0,10);
+  }
+  render();
+}
+
+/* ====== DATA FETCH ====== */
+function csvUrl(sheet){
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
+}
+async function fetchSheet(name){
+  let res;
+  try{
+    res=await fetch(csvUrl(name));
+  }catch(e){
+    throw new Error(`No se pudo conectar con Google (pestaña "${name}"). Si abriste el archivo con doble clic, el navegador bloquea los pedidos: subilo a Vercel o serví por http.`);
+  }
+  if(!res.ok) throw new Error(`La pestaña "${name}" devolvió HTTP ${res.status}.`);
+  const text=await res.text();
+  if(text.trim().startsWith('<')) throw new Error(`La pestaña "${name}" no es accesible. Verificá que el Sheet sea público (cualquiera con el link).`);
+  return Papa.parse(text,{header:true,skipEmptyLines:true}).data;
+}
+
+/* ====== PROCESSING (mirrors the app) ====== */
+function processCategoryAndTitle(url, originalTitle, nomMap){
+  let category='workshop', extractedId=null, cleanTitle=originalTitle||'Unknown';
+  const titleLower=(originalTitle||'').toLowerCase();
+  const isWorkshop=titleLower.includes('workshop');
+  if(url.includes('/course/')){category='course';const m=url.match(/course\/([a-zA-Z0-9-]+)/);if(m)extractedId=m[1];}
+  else if(url.includes('quiz')){category='course';const m=url.match(/cohortId=([a-zA-Z0-9-]+)/);if(m)extractedId=m[1];}
+  const cm=url.match(/[?&]cohort=([a-zA-Z0-9-]+)/);
+  if(cm&&!isWorkshop)category='course';
+  if(extractedId&&nomMap.has(extractedId)){cleanTitle=nomMap.get(extractedId);if(!isWorkshop)category='course';}
+  if(isWorkshop)category='workshop';
+  return {category,cleanTitle,extractedId};
+}
+
+function weekStart(d){
+  const dt=new Date(d); const day=(dt.getDay()+6)%7; // Monday=0
+  dt.setHours(0,0,0,0); dt.setDate(dt.getDate()-day); return dt;
+}
+function fmtWeek(dt){return dt.toISOString().slice(0,10);}
+function fmtWeekLabel(s){const d=new Date(s);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'});}
+
+let RATINGS=[], COURSE_RATINGS=[], LIVE=[];
+
+async function loadAll(){
+  const btn=document.getElementById('reloadBtn'); btn.disabled=true; btn.textContent='↻ Cargando…';
+  document.getElementById('app').innerHTML='<div class="loading"><div class="spinner"></div><p style="font-weight:700">Cargando datos desde Google Sheets…</p></div>';
+  try{
+    const [rawRatings,nom,newCC,live]=await Promise.all([
+      fetchSheet('Valoraciones por Modulo'),
+      fetchSheet('nomenclatura'),
+      fetchSheet('comisiones_cc_nuevo'),
+      fetchSheet('live_sessions')
+    ]);
+
+    const nomMap=new Map();
+    nom.forEach(n=>{const id=(n['ID 4.0']||'').trim();const t=(n['Título Curso Limpio']||'').trim();if(id&&t)nomMap.set(id,t);});
+
+    const newCCSet=new Set();
+    newCC.forEach(r=>{
+      const id=String(r['Comisión']||r['comision']||r['Comision']||r['ID']||r['id']||r['ID Comisión']||r['id_comision']||'').trim();
+      if(id&&id.length>=3)newCCSet.add(id);
+    });
+
+    RATINGS=rawRatings.map(r=>{
+      const url=r.url||'';
+      const {category,cleanTitle,extractedId}=processCategoryAndTitle(url,r.workshop_title||'',nomMap);
+      const ts=new Date(r.timestamp);
+      return {
+        rating:parseFloat(r.rating)||0,
+        comment:r.comment||r.Comment||r.Comentario||r.Comentarios||r.Feedback||r.feedback||'',
+        course:cleanTitle, module:r.module_name||'',
+        timestamp:ts, category, extractedId,
+        isNewCC: !!(extractedId && newCCSet.has(String(extractedId).trim()))
+      };
+    }).filter(r=>!isNaN(r.timestamp.getTime()));
+
+    COURSE_RATINGS=RATINGS.filter(r=>r.category==='course');
+
+    LIVE=live.map(s=>({
+      topic:(s['Título']||'Sin temática').trim(),
+      registered:parseInt(String(s['Inscriptos (total)']||'0').replace(/\D/g,''))||0,
+      active:parseInt(String(s['Inscriptos (activos)']||'0').replace(/\D/g,''))||0,
+      status:s['Estado']||'', facilitator:s['Facilitador']||''
+    }));
+
+    render();
+    document.getElementById('updated').textContent='Actualizado: '+new Date().toLocaleString('es-AR');
+  }catch(e){
+    console.error(e);
+    document.getElementById('app').innerHTML='<div class="error"><h2>No se pudieron cargar los datos</h2><p class="muted">Verificá que el Google Sheet siga siendo público. Detalle: '+(e&&e.message?e.message:e)+'</p></div>';
+  }finally{
+    btn.disabled=false; btn.textContent='↻ Recargar';
+  }
+}
+
+/* ====== HELPERS ====== */
+const isBestSeller=name=>{const l=name.toLowerCase();return TOP_SELLING_COURSES.some(s=>{const sl=s.toLowerCase();return l.includes(sl)||sl.includes(l);});};
+function ratingColor(r){if(!r)return '#94a3b8';if(r<4.0)return '#EF4444';if(r<4.6)return '#f59e0b';return '#10b981';}
+function ratingLabel(r){if(!r)return 'Sin datos';if(r<4.0)return 'Crítico';if(r<4.6)return 'A mejorar';return 'Óptimo';}
+function avg(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;}
+
+function courseList(){return Array.from(new Set(COURSE_RATINGS.map(r=>r.course))).filter(Boolean).sort();}
+
+function commissionsFor(course){
+  const cr=baseCourse();
+  const scope = course==='All'?cr:cr.filter(r=>r.course===course);
+  const map={};
+  scope.forEach(d=>{
+    const id=d.extractedId||''; if(!COMMISSION_RE.test(id))return;
+    if(!map[id])map[id]={ratings:[],comments:0,newCC:0,total:0,course:d.course};
+    map[id].ratings.push(d.rating);map[id].total++;
+    if(d.isNewCC)map[id].newCC++;
+    if(d.comment&&d.comment.trim())map[id].comments++;
+  });
+  return Object.entries(map).map(([id,v])=>({
+    id, avgRating:avg(v.ratings), responses:v.ratings.length, comments:v.comments,
+    isNewCC:v.newCC>v.total/2, course:v.course
+  })).sort((a,b)=>a.avgRating-b.avgRating);
+}
+
+function weeklyTrend(scope){
+  const map={};
+  scope.forEach(d=>{
+    const wk=fmtWeek(weekStart(d.timestamp));
+    if(!map[wk])map[wk]={ns:0,nc:0,os:0,oc:0};
+    if(d.isNewCC){map[wk].ns+=d.rating;map[wk].nc++;}else{map[wk].os+=d.rating;map[wk].oc++;}
+  });
+  return Object.entries(map).map(([wk,v])=>({
+    wk, nuevo:v.nc?+(v.ns/v.nc).toFixed(2):null, viejo:v.oc?+(v.os/v.oc).toFixed(2):null, n:v.nc+v.oc
+  })).sort((a,b)=>a.wk.localeCompare(b.wk));
+}
+
+function courseStats(){
+  const map={};
+  baseCourse().forEach(d=>{if(!map[d.course])map[d.course]={s:0,c:0};map[d.course].s+=d.rating;map[d.course].c++;});
+  return Object.entries(map).map(([name,v])=>({name,avgRating:+(v.s/v.c).toFixed(2),responses:v.c,isBestSeller:isBestSeller(name)}));
+}
+
+/* ====== RENDER ====== */
+let charts={};
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};}
+
+function render(){
+  destroyCharts();
+  const courses=courseList();
+  const opts='<option value="All">Todos los cursos</option>'+courses.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('');
+
+  // Weekly summary (this week vs last week) — course ratings within filter
+  const cr=baseCourse();
+  const trend=weeklyTrend(cr);
+  const allWeeks={};
+  cr.forEach(d=>{const wk=fmtWeek(weekStart(d.timestamp));(allWeeks[wk]=allWeeks[wk]||[]).push(d.rating);});
+  const weekKeys=Object.keys(allWeeks).sort();
+  const curWk=weekKeys[weekKeys.length-1], prevWk=weekKeys[weekKeys.length-2];
+  const curAvg=curWk?avg(allWeeks[curWk]):0, prevAvg=prevWk?avg(allWeeks[prevWk]):0;
+  const curN=curWk?allWeeks[curWk].length:0, prevN=prevWk?allWeeks[prevWk].length:0;
+  const dRating=prevAvg?(curAvg-prevAvg):0;
+  const lastTrend=trend[trend.length-1]||{};
+
+  const presets=[['all','Todo'],['w4','4 sem.'],['w8','8 sem.'],['w12','12 sem.'],['w26','26 sem.'],['custom','Personalizado']];
+  document.getElementById('app').innerHTML=`
+    <div class="card" style="padding:16px 20px;margin-bottom:16px">
+      <div class="row">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="lbl" style="color:var(--muted)">Período</span>
+          <select id="presetSel">${presets.map(p=>`<option value="${p[0]}" ${FILTER.preset===p[0]?'selected':''}>${p[1]}</option>`).join('')}</select>
+          <input type="date" id="fStart" value="${FILTER.start}" style="padding:9px 10px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-weight:600">
+          <span class="muted">→</span>
+          <input type="date" id="fEnd" value="${FILTER.end}" style="padding:9px 10px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-weight:600">
+        </div>
+        <span class="muted" style="font-size:12px;font-weight:700">${FILTER.start||FILTER.end?`${FILTER.start||'inicio'} → ${FILTER.end||'hoy'}`:'Todo el histórico'}</span>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab ${ACTIVE_VIEW==='cursos'?'active':''}" data-v="cursos">Ratings por curso</button>
+      <button class="tab ${ACTIVE_VIEW==='cc'?'active':''}" data-v="cc">CC nuevo vs viejo</button>
+      <button class="tab ${ACTIVE_VIEW==='prioridad'?'active':''}" data-v="prioridad">Prioridad · Top vendidos</button>
+      <button class="tab ${ACTIVE_VIEW==='tematica'?'active':''}" data-v="tematica">Temática · Live Sessions</button>
+    </div>
+
+    <!-- WEEKLY SUMMARY (always visible) -->
+    <div class="card">
+      <div class="row"><h2>📅 Esta semana ${curWk?'· semana del '+fmtWeekLabel(curWk):''}</h2>
+        <span class="muted" style="font-size:12px;font-weight:700">vs. semana anterior</span></div>
+      <div class="grid kpis" style="margin-top:16px">
+        <div class="kpi"><div class="lbl">Rating promedio</div><div class="val" style="color:${ratingColor(curAvg)}">${curAvg?curAvg.toFixed(2):'—'}</div>
+          <div class="delta ${dRating>0.001?'up':dRating<-0.001?'down':'flat'}">${dRating?(dRating>0?'▲ +':'▼ ')+dRating.toFixed(2):'sin cambio'}</div></div>
+        <div class="kpi"><div class="lbl">Respuestas</div><div class="val">${curN}</div>
+          <div class="delta ${curN-prevN>0?'up':curN-prevN<0?'down':'flat'}">${prevN?(curN-prevN>=0?'+':'')+(curN-prevN)+' vs '+prevN:''}</div></div>
+        <div class="kpi"><div class="lbl">CC Nuevo (sem.)</div><div class="val" style="color:#10b981">${lastTrend.nuevo!=null?lastTrend.nuevo.toFixed(2):'—'}</div></div>
+        <div class="kpi"><div class="lbl">CC Viejo (sem.)</div><div class="val" style="color:#FF632B">${lastTrend.viejo!=null?lastTrend.viejo.toFixed(2):'—'}</div></div>
+      </div>
+    </div>
+
+    <!-- VIEW: CURSOS -->
+    <section class="view ${ACTIVE_VIEW==='cursos'?'active':''}" id="v-cursos">
+      <div class="card">
+        <div class="row"><h2>🎓 Ratings por curso</h2>
+          <select id="courseSel">${opts}</select></div>
+        <div id="coursePanel"></div>
+      </div>
+    </section>
+
+    <!-- VIEW: CC -->
+    <section class="view ${ACTIVE_VIEW==='cc'?'active':''}" id="v-cc">
+      <div class="card dark">
+        <h2 style="color:#fff">📈 Tendencia semanal · CC nuevo vs viejo (todos los cursos)</h2>
+        <p class="sub">Histórico. Se recalcula con lo que llega al Sheet cada semana.</p>
+        <div class="chart-box"><canvas id="ccGlobal"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="row"><h2>📊 CC nuevo vs viejo por curso</h2>
+          <select id="ccCourseSel">${opts}</select></div>
+        <div class="chart-box"><canvas id="ccByCourse"></canvas></div>
+      </div>
+    </section>
+
+    <!-- VIEW: PRIORIDAD -->
+    <section class="view ${ACTIVE_VIEW==='prioridad'?'active':''}" id="v-prioridad">
+      <div class="card">
+        <h2>🏆 Prioridad real: top 5 más vendidos × rating</h2>
+        <p class="sub">Dónde conviene enfocar la mejora: lo que más vendemos y peor puntúa.</p>
+        <div class="chart-box"><canvas id="sellers"></canvas></div>
+        <div id="sellerCards" class="grid kpis" style="margin-top:16px"></div>
+      </div>
+      <div class="card">
+        <h2>📋 Mejor y peor rating <span class="muted" style="font-size:13px;font-weight:700">(★ = top vendido)</span></h2>
+        <div class="lists" style="margin-top:14px">
+          <div><h3 style="color:#EF4444;font-size:14px;margin-bottom:8px">Peor rating</h3><div id="worstList"></div></div>
+          <div><h3 style="color:#10b981;font-size:14px;margin-bottom:8px">Mejor rating</h3><div id="bestList"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: TEMATICA -->
+    <section class="view ${ACTIVE_VIEW==='tematica'?'active':''}" id="v-tematica">
+      <div class="card">
+        <h2>🏷️ Comparación por temática · Live Sessions</h2>
+        <p class="sub">Inscriptos totales vs. inscriptos activos por temática (top 12).</p>
+        <div class="chart-box tall"><canvas id="topics"></canvas></div>
+        <div class="note">⚠️ Los <b>asistentes reales</b> se cargan manualmente en la app (Firebase) y no están en el Sheet público, por eso acá se compara <b>inscriptos totales vs. activos</b>. Cuando definan dónde guardar la asistencia en el Sheet, lo conecto.</div>
+        <div style="overflow-x:auto;margin-top:16px"><table id="topicsTable"></table></div>
+      </div>
+    </section>
+  `;
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+    ACTIVE_VIEW=t.dataset.v;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('v-'+t.dataset.v).classList.add('active');
+  });
+
+  // Date filter handlers
+  document.getElementById('presetSel').onchange=e=>applyPreset(e.target.value);
+  document.getElementById('fStart').onchange=e=>{FILTER.start=e.target.value;FILTER.preset='custom';render();};
+  document.getElementById('fEnd').onchange=e=>{FILTER.end=e.target.value;FILTER.preset='custom';render();};
+
+  // Course panel
+  const courseSel=document.getElementById('courseSel');
+  courseSel.onchange=()=>renderCoursePanel(courseSel.value);
+  renderCoursePanel('All');
+
+  // CC charts
+  renderCCGlobal(trend);
+  const ccSel=document.getElementById('ccCourseSel');
+  ccSel.onchange=()=>renderCCByCourse(ccSel.value);
+  renderCCByCourse('All');
+
+  // Priority
+  renderPriority();
+
+  // Topics
+  renderTopics();
+}
+
+function renderCoursePanel(course){
+  const el=document.getElementById('coursePanel');
+  const comms=commissionsFor(course);
+  if(course==='All'){
+    el.innerHTML=`<div class="note" style="margin-top:16px">Seleccioná un curso para ver su rating, sus comisiones y cuáles tienen el CC nuevo. (Mostrando todas las comisiones identificadas: ${comms.length})</div>`+commTable(comms,true);
+    return;
+  }
+  const scope=baseCourse().filter(r=>r.course===course);
+  const a=avg(scope.map(r=>r.rating));
+  const newCount=comms.filter(c=>c.isNewCC).length;
+  el.innerHTML=`
+    <div class="grid kpis" style="margin-top:16px">
+      <div class="kpi"><div class="lbl">Rating del curso</div><div class="val" style="color:${ratingColor(a)}">${a?a.toFixed(2):'—'}</div></div>
+      <div class="kpi"><div class="lbl">Respuestas</div><div class="val">${scope.length}</div></div>
+      <div class="kpi"><div class="lbl">Comisiones</div><div class="val">${comms.length}</div></div>
+      <div class="kpi"><div class="lbl">Con CC nuevo</div><div class="val" style="color:#10b981">${newCount}<span class="muted" style="font-size:15px">/${comms.length}</span></div></div>
+    </div>
+    ${isBestSeller(course)?'<div style="margin-top:12px"><span class="pill seller">★ Top vendido</span></div>':''}
+    ${commTable(comms,false)}`;
+}
+function commTable(comms,showCourse){
+  return `<div style="overflow-x:auto;margin-top:16px"><table>
+    <thead><tr><th>Comisión</th>${showCourse?'<th>Curso</th>':''}<th class="c">CC</th><th class="c">Rating</th><th class="c">Respuestas</th><th class="c">Comentarios</th></tr></thead>
+    <tbody>${comms.map(c=>`<tr><td style="font-weight:700">${c.id}</td>${showCourse?`<td class="muted">${c.course||''}</td>`:''}
+      <td class="c"><span class="pill ${c.isNewCC?'new':'old'}">${c.isNewCC?'Nuevo':'Viejo'}</span></td>
+      <td class="c" style="font-weight:800;color:${ratingColor(c.avgRating)}">${c.avgRating.toFixed(2)}</td>
+      <td class="c">${c.responses}</td><td class="c">${c.comments}</td></tr>`).join('')||`<tr><td colspan="6" class="c muted" style="padding:24px">No hay comisiones identificables.</td></tr>`}</tbody></table></div>`;
+}
+
+const lineCfg=(data,dark)=>({
+  type:'line',
+  data:{labels:data.map(d=>fmtWeekLabel(d.wk)),datasets:[
+    {label:'CC Nuevo',data:data.map(d=>d.nuevo),borderColor:'#10b981',backgroundColor:'#10b981',tension:.3,spanGaps:true,borderWidth:2.5,pointRadius:2},
+    {label:'CC Viejo',data:data.map(d=>d.viejo),borderColor:'#FF632B',backgroundColor:'#FF632B',tension:.3,spanGaps:true,borderWidth:2.5,pointRadius:2}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,
+    scales:{y:{min:3,max:5,grid:{color:dark?'rgba(255,255,255,.08)':'#eee'},ticks:{color:dark?'rgba(255,255,255,.6)':'#666'}},
+            x:{grid:{display:false},ticks:{color:dark?'rgba(255,255,255,.6)':'#666',maxRotation:0,autoSkip:true,maxTicksLimit:12}}},
+    plugins:{legend:{labels:{color:dark?'#fff':'#333',font:{weight:'700'}}}}}
+});
+function renderCCGlobal(trend){charts.ccGlobal=new Chart(document.getElementById('ccGlobal'),lineCfg(trend,true));}
+function renderCCByCourse(course){
+  if(charts.ccByCourse)charts.ccByCourse.destroy();
+  const cr=baseCourse();
+  const scope=course==='All'?cr:cr.filter(r=>r.course===course);
+  charts.ccByCourse=new Chart(document.getElementById('ccByCourse'),lineCfg(weeklyTrend(scope),false));
+}
+
+function renderPriority(){
+  const stats=courseStats();
+  const sellers=TOP_SELLING_COURSES.map(s=>{
+    const sl=s.toLowerCase();
+    const m=stats.filter(c=>c.name.toLowerCase().includes(sl)||sl.includes(c.name.toLowerCase())).sort((a,b)=>b.responses-a.responses)[0];
+    return {seller:s,matched:m?m.name:null,avgRating:m?m.avgRating:0,responses:m?m.responses:0};
+  }).sort((a,b)=>{if(!a.avgRating)return 1;if(!b.avgRating)return -1;return a.avgRating-b.avgRating;});
+
+  charts.sellers=new Chart(document.getElementById('sellers'),{
+    type:'bar',
+    data:{labels:sellers.map(s=>s.seller),datasets:[{data:sellers.map(s=>s.avgRating),backgroundColor:sellers.map(s=>ratingColor(s.avgRating)),borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{min:0,max:5,grid:{color:'#eee'}},y:{grid:{display:false}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const s=sellers[c.dataIndex];return `${s.avgRating?s.avgRating.toFixed(2):'sin datos'} · ${s.responses} resp. · ${s.matched||'sin match'}`;}}}}}
+  });
+  document.getElementById('sellerCards').innerHTML=sellers.map(s=>`
+    <div class="kpi"><div class="nm" style="font-weight:800;font-size:13px">${s.seller}</div>
+      <div class="val" style="color:${ratingColor(s.avgRating)};font-size:26px">${s.avgRating?s.avgRating.toFixed(2):'—'}</div>
+      <div class="delta" style="color:${ratingColor(s.avgRating)}">${ratingLabel(s.avgRating)}</div>
+      ${s.matched?'':'<div class="muted" style="font-size:10px;margin-top:4px">Sin match en ratings</div>'}</div>`).join('');
+
+  const eligible=stats.filter(c=>c.responses>=MIN_RESPONSES);
+  const worst=[...eligible].sort((a,b)=>a.avgRating-b.avgRating).slice(0,8);
+  const best=[...eligible].sort((a,b)=>b.avgRating-a.avgRating).slice(0,8);
+  const rowHtml=c=>`<div class="listrow"><div class="nm">${c.name} ${c.isBestSeller?'<span class="pill seller">★</span>':''}</div><div class="sc" style="color:${ratingColor(c.avgRating)}">${c.avgRating.toFixed(2)}</div></div>`;
+  document.getElementById('worstList').innerHTML=worst.map(rowHtml).join('')||'<p class="muted">Sin datos suficientes.</p>';
+  document.getElementById('bestList').innerHTML=best.map(rowHtml).join('')||'<p class="muted">Sin datos suficientes.</p>';
+}
+
+function renderTopics(){
+  const map={};
+  LIVE.forEach(s=>{const t=s.topic||'Sin temática';if(!map[t])map[t]={sessions:0,registered:0,active:0};map[t].sessions++;map[t].registered+=s.registered;map[t].active+=s.active;});
+  const topics=Object.entries(map).map(([topic,v])=>({topic,...v,rate:v.registered?Math.round(v.active/v.registered*100):0}))
+    .sort((a,b)=>b.registered-a.registered).slice(0,12);
+
+  charts.topics=new Chart(document.getElementById('topics'),{
+    type:'bar',
+    data:{labels:topics.map(t=>t.topic.length>30?t.topic.slice(0,29)+'…':t.topic),
+      datasets:[{label:'Inscriptos',data:topics.map(t=>t.registered),backgroundColor:'#FF632B',borderRadius:4},
+                {label:'Activos',data:topics.map(t=>t.active),backgroundColor:'#10b981',borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{color:'#eee'}},y:{grid:{display:false},ticks:{font:{size:10}}}},
+      plugins:{legend:{labels:{font:{weight:'700'}}}}}
+  });
+  document.getElementById('topicsTable').innerHTML=`
+    <thead><tr><th>Temática</th><th class="c">Sesiones</th><th class="c">Inscriptos</th><th class="c">Activos</th><th class="c">% Activos</th></tr></thead>
+    <tbody>${topics.map(t=>`<tr><td style="font-weight:700;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.topic}</td>
+      <td class="c">${t.sessions}</td><td class="c" style="font-weight:800;color:#FF632B">${t.registered.toLocaleString()}</td>
+      <td class="c" style="font-weight:800;color:#10b981">${t.active.toLocaleString()}</td><td class="c" style="font-weight:700">${t.rate}%</td></tr>`).join('')||'<tr><td colspan="5" class="c muted" style="padding:24px">No hay datos de sesiones.</td></tr>'}</tbody>`;
+}
+
+loadAll();
+</script>
+</body>
+</html>
