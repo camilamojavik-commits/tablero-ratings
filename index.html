@@ -210,13 +210,12 @@ async function loadAll(){
       status:s['Estado']||'', facilitator:s['Facilitador']||''
     }));
 
-    // Solo cursos: excluir workshops on demand (cruce con live_sessions) y títulos tipo workshop/webinar
+    // Solo cursos del catálogo oficial: títulos presentes en la hoja "nomenclatura"
+    // (Título Curso Limpio). Los módulos sueltos y workshops on demand no están ahí,
+    // así que quedan excluidos automáticamente.
     const norm=t=>(t||'').toLowerCase().replace(/\s+/g,' ').trim();
-    const wsSet=new Set(LIVE.map(s=>norm(s.topic)));
-    const wsKeywords=['workshop','webinar','on demand','on-demand','masterclass','master class','charla','evento'];
-    COURSE_RATINGS=RATINGS.filter(r=>r.category==='course')
-      .filter(r=>!wsSet.has(norm(r.course)))
-      .filter(r=>!wsKeywords.some(k=>norm(r.course).includes(k)));
+    const courseCatalog=new Set(Array.from(nomMap.values()).map(norm));
+    COURSE_RATINGS=RATINGS.filter(r=>r.category==='course' && courseCatalog.has(norm(r.course)));
 
     FEEDBACK=(fb||[]).map(r=>({
       comment:r.feedback||r.Feedback||r.comment||r.Comentario||'',
