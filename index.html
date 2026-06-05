@@ -203,14 +203,20 @@ async function loadAll(){
       };
     }).filter(r=>!isNaN(r.timestamp.getTime()));
 
-    COURSE_RATINGS=RATINGS.filter(r=>r.category==='course');
-
     LIVE=live.map(s=>({
       topic:(s['Título']||'Sin temática').trim(),
       registered:parseInt(String(s['Inscriptos (total)']||'0').replace(/\D/g,''))||0,
       active:parseInt(String(s['Inscriptos (activos)']||'0').replace(/\D/g,''))||0,
       status:s['Estado']||'', facilitator:s['Facilitador']||''
     }));
+
+    // Solo cursos: excluir workshops on demand (cruce con live_sessions) y títulos tipo workshop/webinar
+    const norm=t=>(t||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const wsSet=new Set(LIVE.map(s=>norm(s.topic)));
+    const wsKeywords=['workshop','webinar','on demand','on-demand','masterclass','master class','charla','evento'];
+    COURSE_RATINGS=RATINGS.filter(r=>r.category==='course')
+      .filter(r=>!wsSet.has(norm(r.course)))
+      .filter(r=>!wsKeywords.some(k=>norm(r.course).includes(k)));
 
     FEEDBACK=(fb||[]).map(r=>({
       comment:r.feedback||r.Feedback||r.comment||r.Comentario||'',
