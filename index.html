@@ -334,15 +334,13 @@ function render(){
       </div>
     </div>
 
-    <!-- GENERAL WEEKLY EVOLUTION (below metrics) -->
-    <div class="card">
-      <h2>📈 Evolución general de calificaciones (semanal)</h2>
-      <p class="sub">Promedio de rating de contenido por semana, todos los cursos.</p>
-      <div class="chart-box"><canvas id="evoGlobal"></canvas></div>
-    </div>
-
     <!-- VIEW: CURSOS -->
     <section class="view ${ACTIVE_VIEW==='cursos'?'active':''}" id="v-cursos">
+      <div class="card">
+        <h2>📈 Evolución general de calificaciones (semanal)</h2>
+        <p class="sub">Promedio de rating de contenido por semana, todos los cursos.</p>
+        <div class="chart-box"><canvas id="evoGlobal"></canvas></div>
+      </div>
       <div class="card">
         <div class="row"><h2>📚 Rating de contenido</h2>
           <select id="courseSel">${opts}</select></div>
@@ -400,6 +398,7 @@ function render(){
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
     document.getElementById('v-'+t.dataset.v).classList.add('active');
+    if(t.dataset.v==='cursos') renderEvoGlobal();
   });
 
   // Date filter handlers
@@ -412,8 +411,8 @@ function render(){
   courseSel.onchange=()=>renderCoursePanel(courseSel.value);
   renderCoursePanel('All');
 
-  // General weekly evolution (single line)
-  charts.evoGlobal=new Chart(document.getElementById('evoGlobal'),avgCfg(weeklyAvg(baseCourse()),'#6366f1'));
+  // General weekly evolution (single line) — only when its tab is visible
+  if(ACTIVE_VIEW==='cursos') renderEvoGlobal();
 
   // CC charts
   renderCCGlobal(trend);
@@ -432,16 +431,17 @@ function renderCoursePanel(course){
   const el=document.getElementById('coursePanel');
   const comms=commissionsFor(course);
   if(course==='All'){
-    // Resumen de feedback por curso (cantidad de comentarios por curso)
-    const byCourse={};
-    baseCourse().forEach(d=>{if(d.comment&&d.comment.trim()){byCourse[d.course]=(byCourse[d.course]||0)+1;}});
-    const fbRows=Object.entries(byCourse).sort((a,b)=>b[1]-a[1]).slice(0,20)
-      .map(([c,n])=>`<tr><td style="font-weight:700">${c}</td><td class="c" style="font-weight:800">${n}</td></tr>`).join('');
-    el.innerHTML=`<div class="note" style="margin-top:16px">Seleccioná un curso para ver su rating semanal, comisiones (con CC nuevo) y el feedback de los alumnos de ese curso.</div>`
+    // Comentarios recientes de todos los cursos
+    const allComments=baseCourse().filter(d=>d.comment&&d.comment.trim()).sort((x,y)=>y.timestamp-x.timestamp);
+    el.innerHTML=`<div class="note" style="margin-top:16px">Seleccioná un curso para ver su rating semanal, comisiones (con CC nuevo) y solo el feedback de ese curso.</div>`
       +commTable(comms,true)
-      +`<div class="card" style="margin-top:16px"><h2 style="font-size:15px">💬 Feedback por curso (cantidad de comentarios)</h2>
-         <div style="overflow-x:auto;margin-top:12px"><table><thead><tr><th>Curso</th><th class="c">Comentarios</th></tr></thead>
-         <tbody>${fbRows||'<tr><td colspan="2" class="c muted" style="padding:20px">Sin comentarios.</td></tr>'}</tbody></table></div></div>`;
+      +`<div class="card" style="margin-top:16px"><h2 style="font-size:15px">💬 Feedback de los alumnos <span class="muted" style="font-size:12px;font-weight:700">(${allComments.length} comentarios · todos los cursos)</span></h2>
+         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;max-height:460px;overflow-y:auto">
+         ${allComments.slice(0,40).map(c=>`<div class="listrow" style="flex-direction:column;align-items:flex-start;gap:6px">
+           <div style="font-size:13px;color:var(--ink);line-height:1.4">"${(c.comment||'').replace(/</g,'&lt;')}"</div>
+           <div class="muted" style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em">${c.timestamp.toLocaleDateString('es-AR')} · ${(c.course||'').slice(0,40)} · ${(c.rating||0).toFixed(1)}★</div>
+         </div>`).join('')||'<p class="muted" style="grid-column:1/-1;text-align:center;padding:20px">Sin comentarios.</p>'}
+         </div></div>`;
     return;
   }
   const scope=baseCourse().filter(r=>r.course===course);
@@ -503,6 +503,11 @@ const avgCfg=(data,color)=>({
             x:{grid:{display:false},ticks:{color:'#666',maxRotation:0,autoSkip:true,maxTicksLimit:12}}},
     plugins:{legend:{display:false}}}
 });
+function renderEvoGlobal(){
+  if(charts.evoGlobal){try{charts.evoGlobal.destroy()}catch(e){}}
+  const el=document.getElementById('evoGlobal'); if(!el)return;
+  charts.evoGlobal=new Chart(el,avgCfg(weeklyAvg(baseCourse()),'#6366f1'));
+}
 function renderCCGlobal(trend){charts.ccGlobal=new Chart(document.getElementById('ccGlobal'),lineCfg(trend,true));}
 function renderCCByCourse(course){
   if(charts.ccByCourse)charts.ccByCourse.destroy();
